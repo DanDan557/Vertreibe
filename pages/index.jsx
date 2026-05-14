@@ -1,8 +1,8 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import {
-  LayoutDashboard, TrendingUp, Users, Target, Sparkles, Calculator, LogOut, Lock, Plus, Trash2, Edit3, Check, X, ChevronRight, Menu, Send, Loader2, Award, ArrowRight, Eye, EyeOff, CircleCheck, Settings, Briefcase, Heart, Star, Compass, Brain, Save, UserPlus, Activity, Sparkle, Coins, CircleDashed, ChevronDown, Zap
+  LayoutDashboard, TrendingUp, Users, Target, Sparkles, Calculator, LogOut, Lock, Plus, Trash2, Edit3, Check, X, ChevronRight, Menu, Send, Loader2, Award, ArrowRight, Eye, EyeOff, CircleCheck, Settings, Briefcase, Heart, Star, Compass, Brain, Save, UserPlus, Activity, Sparkle, Coins
 } from 'lucide-react';
-import { LineChart, Line, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 const DEFAULT_CAREER_LEVELS = [
   { name: 'Trainee', threshold: 0 },
@@ -25,7 +25,10 @@ const storage = {
     try {
       if (typeof window === 'undefined') return fallback;
       const result = await window.storage?.get?.(key);
-      if (!result) return localStorage.getItem(key) ? JSON.parse(localStorage.getItem(key)) : fallback;
+      if (!result) {
+        const local = localStorage.getItem(key);
+        return local ? JSON.parse(local) : fallback;
+      }
       try { return JSON.parse(result.value); } catch { return result.value; }
     } catch { return fallback; }
   },
@@ -38,23 +41,12 @@ const storage = {
       return true;
     } catch { return false; }
   },
-  async delete(key) {
-    try {
-      await window.storage?.delete?.(key);
-      localStorage.removeItem(key);
-      return true;
-    } catch { return false; }
-  }
 };
 
 const fmtEUR = (n) => {
   if (n === null || n === undefined || isNaN(n)) return '0 €';
   return new Intl.NumberFormat('de-DE', { style: 'currency', currency: 'EUR', maximumFractionDigits: 0 }).format(n);
 };
-
-const fmtNum = (n) => new Intl.NumberFormat('de-DE').format(n || 0);
-const formatDate = (d) => !d ? '' : new Date(d).toLocaleDateString('de-DE', { day: '2-digit', month: 'short', year: 'numeric' });
-const uuid = () => Math.random().toString(36).slice(2) + Date.now().toString(36);
 
 const getTotalRevenue = (data) => {
   const closed = (data.appointments || []).filter(a => a.closed).reduce((s, a) => s + (Number(a.revenue) || 0), 0);
@@ -78,11 +70,10 @@ const getCareerProgress = (totalRevenue, levels) => {
   const remainingToNext = next ? next.threshold - totalRevenue : 0;
   const segmentSize = next ? next.threshold - current.threshold : 1;
   const segmentProgress = next ? ((totalRevenue - current.threshold) / segmentSize) * 100 : 100;
-  return { current, next, remainingToNext, segmentProgress: Math.max(0, Math.min(100, segmentProgress)), currentIndex };
+  return { current, next, remainingToNext, segmentProgress: Math.max(0, Math.min(100, segmentProgress)) };
 };
 
-// UI Components
-const Button = ({ children, onClick, variant = 'primary', size = 'md', className = '', type = 'button', disabled = false }) => {
+const Button = ({ children, onClick, variant = 'primary', size = 'md', className = '', disabled = false }) => {
   const variants = {
     primary: 'bg-stone-900 text-white hover:bg-stone-800',
     secondary: 'bg-stone-100 text-stone-900 hover:bg-stone-200',
@@ -92,7 +83,7 @@ const Button = ({ children, onClick, variant = 'primary', size = 'md', className
   };
   const sizes = { sm: 'px-3 py-1.5 text-xs', md: 'px-4 py-2 text-sm', lg: 'px-5 py-2.5 text-sm' };
   return (
-    <button type={type} onClick={onClick} disabled={disabled} className={`inline-flex items-center justify-center gap-1.5 rounded-full font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed ${variants[variant]} ${sizes[size]} ${className}`}>
+    <button onClick={onClick} disabled={disabled} className={`inline-flex items-center justify-center gap-1.5 rounded-full font-medium transition-all disabled:opacity-50 disabled:cursor-not-allowed ${variants[variant]} ${sizes[size]} ${className}`}>
       {children}
     </button>
   );
@@ -104,17 +95,14 @@ const Input = ({ value, onChange, placeholder, type = 'text', className = '' }) 
 
 const Label = ({ children }) => <label className="block text-xs font-medium text-stone-600 mb-1.5 uppercase tracking-wider">{children}</label>;
 
-const Modal = ({ open, onClose, title, children, size = 'md' }) => {
+const Modal = ({ open, onClose, title, children }) => {
   if (!open) return null;
-  const sizes = { sm: 'max-w-md', md: 'max-w-lg', lg: 'max-w-2xl' };
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-stone-950/50 backdrop-blur-sm" onClick={onClose}>
-      <div className={`bg-white rounded-2xl ${sizes[size]} w-full max-h-[90vh] overflow-hidden flex flex-col`} onClick={(e) => e.stopPropagation()}>
+      <div className="bg-white rounded-2xl max-w-lg w-full max-h-[90vh] overflow-hidden flex flex-col" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between px-6 py-5 border-b border-stone-200">
           <h2 className="text-lg font-semibold text-stone-900">{title}</h2>
-          <button onClick={onClose} className="p-1.5 hover:bg-stone-100 rounded-lg">
-            <X className="w-4 h-4" />
-          </button>
+          <button onClick={onClose} className="p-1.5 hover:bg-stone-100 rounded-lg"><X className="w-4 h-4" /></button>
         </div>
         <div className="overflow-y-auto p-6">{children}</div>
       </div>
@@ -127,13 +115,10 @@ const Badge = ({ children, variant = 'default' }) => {
     default: 'bg-stone-100 text-stone-700',
     success: 'bg-emerald-50 text-emerald-700',
     info: 'bg-blue-50 text-blue-700',
-    danger: 'bg-red-50 text-red-700',
-    dark: 'bg-stone-900 text-white'
   };
   return <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${variants[variant]}`}>{children}</span>;
 };
 
-// MAIN APP
 export default function App() {
   const [authed, setAuthed] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -182,16 +167,13 @@ export default function App() {
 
   const renderView = () => {
     switch (view) {
-      case 'dashboard': return <DashboardView data={data} setView={setView} />;
-      case 'karriere': return <KarriereView data={data} />;
-      case 'pipeline': return <PipelineView data={data} save={saveData} />;
-      case 'rechner': return <RechnerView data={data} save={saveData} />;
-      case 'umsaetze': return <UmsaetzeView data={data} save={saveData} />;
-      case 'team': return <TeamView data={data} save={saveData} />;
-      case 'ziele': return <ZieleView data={data} save={saveData} />;
-      case 'coach': return <CoachView data={data} save={saveData} />;
-      case 'settings': return <SettingsView data={data} save={saveData} onResetPin={() => { storage.delete('auth_pin'); setAuthed(false); }} />;
-      default: return <DashboardView data={data} setView={setView} />;
+      case 'dashboard': return <Dashboard data={data} setView={setView} />;
+      case 'karriere': return <Karriere data={data} />;
+      case 'pipeline': return <Pipeline data={data} save={saveData} />;
+      case 'rechner': return <Rechner data={data} save={saveData} />;
+      case 'team': return <Team data={data} save={saveData} />;
+      case 'settings': return <Settings data={data} save={saveData} onLogout={() => { storage.delete('auth_session'); setAuthed(false); }} />;
+      default: return <Dashboard data={data} setView={setView} />;
     }
   };
 
@@ -200,14 +182,11 @@ export default function App() {
     { id: 'karriere', label: 'Karriere', icon: TrendingUp },
     { id: 'pipeline', label: 'Pipeline', icon: Briefcase },
     { id: 'rechner', label: 'Rechner', icon: Calculator },
-    { id: 'umsaetze', label: 'Umsätze', icon: Coins },
     { id: 'team', label: 'Team', icon: Users },
-    { id: 'ziele', label: 'Ziele', icon: Target },
-    { id: 'coach', label: 'Coach', icon: Sparkles },
   ];
 
   return (
-    <div className="min-h-screen bg-stone-100" style={{ fontFamily: "'Geist', -apple-system, sans-serif" }}>
+    <div className="min-h-screen bg-stone-100">
       {mobileOpen && <div className="fixed inset-0 bg-stone-900/40 z-30 lg:hidden" onClick={() => setMobileOpen(false)} />}
       <aside className={`fixed lg:sticky top-0 left-0 z-40 h-screen w-60 bg-stone-100 border-r border-stone-200 transform ${mobileOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'} transition-transform flex flex-col`}>
         <div className="px-6 pt-7 pb-8">
@@ -227,7 +206,7 @@ export default function App() {
           })}
         </nav>
         <div className="p-3 border-t border-stone-200 space-y-0.5">
-          {savingStatus && <div className="px-3 py-1.5 text-xs text-stone-500 flex items-center gap-1.5">{savingStatus === 'saving' ? <><Loader2 className="w-3 h-3 animate-spin" /> Speichert...</> : <><CircleCheck className="w-3 h-3 text-emerald-600" /> Gespeichert</>}</div>}
+          {savingStatus && <div className="px-3 py-1.5 text-xs text-stone-500">{savingStatus === 'saving' ? 'Speichert...' : 'Gespeichert ✓'}</div>}
           <button onClick={() => setView('settings')} className={`w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-all ${view === 'settings' ? 'bg-white text-stone-900 font-medium' : 'text-stone-600 hover:bg-white/60'}`}><Settings className="w-4 h-4" /><span>Einstellungen</span></button>
           <button onClick={() => { storage.delete('auth_session'); setAuthed(false); }} className="w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm text-stone-500 hover:bg-white/60"><LogOut className="w-4 h-4" /><span>Abmelden</span></button>
         </div>
@@ -280,35 +259,24 @@ function LoginScreen({ onLogin }) {
     <div className="min-h-screen bg-stone-100 flex items-center justify-center p-6">
       <div className="w-full max-w-md">
         <div className="text-center mb-12">
-          <h1 className="text-5xl font-bold text-stone-900 mb-2">Vertriebscockpit</h1>
+          <h1 className="text-5xl font-bold text-stone-900 mb-2">Cockpit</h1>
           <p className="text-stone-500 text-sm">{isSetup ? 'Erstelle deine PIN' : 'Willkommen zurück'}</p>
         </div>
         <div className="bg-white rounded-2xl p-8 shadow-lg border border-stone-200">
           <div className="space-y-4">
-            <div>
-              <Label>{isSetup ? 'Neue PIN' : 'PIN'}</Label>
-              <Input type="password" value={pin} onChange={(e) => setPin(e.target.value)} placeholder="••••••" onKeyDown={(e) => e.key === 'Enter' && handleSubmit()} autoFocus />
-            </div>
-            {isSetup && (
-              <div>
-                <Label>PIN bestätigen</Label>
-                <Input type="password" value={confirmPin} onChange={(e) => setConfirmPin(e.target.value)} placeholder="••••••" onKeyDown={(e) => e.key === 'Enter' && handleSubmit()} />
-              </div>
-            )}
+            <div><Label>{isSetup ? 'Neue PIN' : 'PIN'}</Label><Input type="password" value={pin} onChange={(e) => setPin(e.target.value)} placeholder="••••••" onKeyDown={(e) => e.key === 'Enter' && handleSubmit()} autoFocus /></div>
+            {isSetup && <div><Label>PIN bestätigen</Label><Input type="password" value={confirmPin} onChange={(e) => setConfirmPin(e.target.value)} placeholder="••••••" onKeyDown={(e) => e.key === 'Enter' && handleSubmit()} /></div>}
             {error && <div className="text-xs text-red-600">{error}</div>}
             <Button onClick={handleSubmit} className="w-full" size="lg"><Lock className="w-4 h-4" />{isSetup ? 'PIN festlegen' : 'Anmelden'}</Button>
           </div>
         </div>
-        <p className="text-center text-xs text-stone-400 mt-6">Geschützt durch Cloud-Speicherung</p>
       </div>
     </div>
   );
 }
 
-// VIEWS
-function DashboardView({ data, setView }) {
+function Dashboard({ data, setView }) {
   const totalRevenue = useMemo(() => getTotalRevenue(data), [data]);
-  const pipelineRevenue = (data.appointments || []).filter(a => !a.closed && a.status !== 'Storniert').reduce((s, a) => s + (Number(a.revenue) || 0), 0);
   const { current, next } = getCareerProgress(totalRevenue, data.careerLevels);
 
   return (
@@ -317,9 +285,9 @@ function DashboardView({ data, setView }) {
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         {[
           { label: 'Gesamtumsatz', value: fmtEUR(totalRevenue) },
-          { label: 'Pipeline', value: fmtEUR(pipelineRevenue) },
           { label: 'Rang', value: current.name },
           { label: 'Team', value: String((data.partners || []).length) },
+          { label: 'Termine', value: String((data.appointments || []).length) },
         ].map((kpi, i) => (
           <div key={i} className="bg-white rounded-xl p-5 border border-stone-200">
             <div className="text-xs text-stone-500 uppercase tracking-wider mb-2">{kpi.label}</div>
@@ -327,61 +295,38 @@ function DashboardView({ data, setView }) {
           </div>
         ))}
       </div>
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 bg-white rounded-xl p-6 border border-stone-200">
-          <h3 className="font-semibold text-stone-900 mb-5">Umsatzentwicklung</h3>
-          <div className="h-56"><ResponsiveContainer width="100%" height="100%"><AreaChart data={[{m:'Jan',r:0},{m:'Feb',r:0},{m:'Mär',r:0},{m:'Apr',r:0},{m:'Mai',r:0},{m:'Jun',r:totalRevenue}]}><defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#1c1917" stopOpacity={.2} /><stop offset="100%" stopColor="#1c1917" stopOpacity={0} /></linearGradient></defs><CartesianGrid stroke="#f5f5f4" vertical={false} /><XAxis dataKey="m" /><YAxis /><Tooltip /><Area type="monotone" dataKey="r" stroke="#1c1917" fill="url(#g)" /></AreaChart></ResponsiveContainer></div>
-        </div>
-        <div className="bg-white rounded-xl p-6 border border-stone-200">
-          <h3 className="font-semibold text-stone-900 mb-3">Karriere</h3>
-          <div className="text-xs text-stone-500 uppercase mb-2">Aktuelle Stufe</div>
-          <div className="text-2xl font-bold text-stone-900 mb-4">{current.name}</div>
-          {next && <><div className="text-xs text-stone-500 mb-1">Nächste: {next.name}</div><div className="text-xs font-medium text-stone-900">noch {fmtEUR(next.threshold - totalRevenue)}</div></>}
-        </div>
+      <div className="bg-white rounded-xl p-6 border border-stone-200">
+        <h3 className="font-semibold text-stone-900 mb-5">Karrierefortschritt</h3>
+        <div className="text-sm"><strong>{current.name}</strong> {next ? `→ ${next.name}` : '(Top erreicht!)'}</div>
       </div>
     </div>
   );
 }
 
-function KarriereView({ data }) {
+function Karriere({ data }) {
   const totalRevenue = useMemo(() => getTotalRevenue(data), [data]);
-  const { current, next, remainingToNext, segmentProgress } = getCareerProgress(totalRevenue, data.careerLevels);
+  const { current, next } = getCareerProgress(totalRevenue, data.careerLevels);
   return (
     <div>
       <h1 className="text-5xl font-bold text-stone-900 mb-8">Dein Aufstieg</h1>
       <div className="bg-stone-900 text-white rounded-2xl p-8 mb-8">
-        <div className="flex justify-between mb-6"><div><div className="text-xs text-stone-400 uppercase">Aktuelle Stufe</div><div className="text-4xl font-bold mt-2">{current.name}</div></div><div className="text-right"><div className="text-xs text-stone-400 uppercase">Umsatz</div><div className="text-4xl font-bold mt-2">{fmtEUR(totalRevenue)}</div></div></div>
-        {next && <><div className="flex justify-between text-sm mb-2"><span>37%</span><span>{next.name}</span></div><div className="bg-white/10 rounded-full h-2 mb-2" style={{background: 'linear-gradient(90deg, white 0%, white ' + segmentProgress + '%, rgba(255,255,255,.1) ' + segmentProgress + '%, rgba(255,255,255,.1) 100%)'}}></div></>}
-      </div>
-      <div className="space-y-2">
-        {(data.careerLevels || DEFAULT_CAREER_LEVELS).map((level, idx) => {
-          const isReached = totalRevenue >= level.threshold;
-          const isCurrent = current.name === level.name;
-          return (
-            <div key={level.name} className={`p-4 rounded-xl border transition-all ${isCurrent ? 'bg-stone-900 text-white border-stone-900' : isReached ? 'bg-stone-100 border-stone-200' : 'bg-white border-stone-200 opacity-50'}`}>
-              <div className="flex items-center justify-between">
-                <div><span className="font-semibold">{level.name}</span> {isCurrent && <Badge variant="dark" className="ml-2">Aktuell</Badge>}</div>
-                <div className="text-sm">{fmtEUR(level.threshold)}</div>
-              </div>
-            </div>
-          );
-        })}
+        <div className="text-4xl font-bold">{current.name}</div>
+        <div className="text-stone-300 mt-2">{fmtEUR(totalRevenue)}</div>
+        {next && <div className="text-sm mt-4">Nächste Stufe: <strong>{next.name}</strong></div>}
       </div>
     </div>
   );
 }
 
-function PipelineView({ data, save }) {
+function Pipeline({ data, save }) {
   const [modalOpen, setModalOpen] = useState(false);
-  const [editing, setEditing] = useState(null);
-  const [form, setForm] = useState({ name: '', type: 'S1', date: '', status: 'Geplant', revenue: '', closed: false });
+  const [form, setForm] = useState({ name: '', revenue: '' });
 
   const submit = async () => {
     if (!form.name.trim()) return;
-    const updated = editing
-      ? (data.appointments || []).map(a => a.id === editing ? { ...form, id: editing, revenue: Number(form.revenue) || 0 } : a)
-      : [...(data.appointments || []), { ...form, id: uuid(), revenue: Number(form.revenue) || 0, createdAt: new Date().toISOString() }];
+    const updated = [...(data.appointments || []), { ...form, id: Math.random().toString(36).slice(2), revenue: Number(form.revenue) || 0 }];
     await save({ ...data, appointments: updated });
+    setForm({ name: '', revenue: '' });
     setModalOpen(false);
   };
 
@@ -389,14 +334,14 @@ function PipelineView({ data, save }) {
     <div>
       <div className="flex justify-between items-center mb-8">
         <h1 className="text-5xl font-bold text-stone-900">Pipeline</h1>
-        <Button onClick={() => { setForm({ name: '', type: 'S1', date: '', status: 'Geplant', revenue: '', closed: false }); setEditing(null); setModalOpen(true); }} size="lg"><Plus className="w-4 h-4" />Neuer Termin</Button>
+        <Button onClick={() => setModalOpen(true)} size="lg"><Plus className="w-4 h-4" />Neuer Termin</Button>
       </div>
       <div className="bg-white rounded-xl border border-stone-200 overflow-hidden">
         <table className="w-full">
-          <thead><tr className="text-xs uppercase text-stone-500 border-b border-stone-200"><th className="px-4 py-3 text-left">Name</th><th className="px-4 py-3 text-left">Art</th><th className="px-4 py-3 text-left">Datum</th><th className="px-4 py-3 text-left">Umsatz</th></tr></thead>
+          <thead><tr className="text-xs uppercase text-stone-500 border-b border-stone-200"><th className="px-4 py-3 text-left">Name</th><th className="px-4 py-3 text-left">Umsatz</th></tr></thead>
           <tbody>
             {(data.appointments || []).map(apt => (
-              <tr key={apt.id} className="border-b border-stone-100 hover:bg-stone-50"><td className="px-4 py-3 font-medium">{apt.name}</td><td className="px-4 py-3"><Badge>{apt.type}</Badge></td><td className="px-4 py-3 text-sm">{formatDate(apt.date)}</td><td className="px-4 py-3 text-sm font-medium">{fmtEUR(apt.revenue || 0)}</td></tr>
+              <tr key={apt.id} className="border-b border-stone-100 hover:bg-stone-50"><td className="px-4 py-3 font-medium">{apt.name}</td><td className="px-4 py-3 text-sm">{fmtEUR(apt.revenue || 0)}</td></tr>
             ))}
           </tbody>
         </table>
@@ -404,7 +349,7 @@ function PipelineView({ data, save }) {
       <Modal open={modalOpen} onClose={() => setModalOpen(false)} title="Neuer Termin">
         <div className="space-y-4">
           <div><Label>Name</Label><Input value={form.name} onChange={(e) => setForm({ ...form, name: e.target.value })} placeholder="Kundenname" autoFocus /></div>
-          <div className="grid grid-cols-2 gap-3"><div><Label>Datum</Label><Input type="date" value={form.date} onChange={(e) => setForm({ ...form, date: e.target.value })} /></div><div><Label>Umsatz (€)</Label><Input type="number" value={form.revenue} onChange={(e) => setForm({ ...form, revenue: e.target.value })} /></div></div>
+          <div><Label>Umsatz (€)</Label><Input type="number" value={form.revenue} onChange={(e) => setForm({ ...form, revenue: e.target.value })} /></div>
           <div className="flex gap-2 pt-3"><Button variant="outline" onClick={() => setModalOpen(false)} className="flex-1">Abbrechen</Button><Button onClick={submit} className="flex-1">Speichern</Button></div>
         </div>
       </Modal>
@@ -412,7 +357,7 @@ function PipelineView({ data, save }) {
   );
 }
 
-function RechnerView({ data, save }) {
+function Rechner({ data, save }) {
   const [age, setAge] = useState('');
   const [av, setAv] = useState('');
   const [bu, setBu] = useState('');
@@ -439,32 +384,23 @@ function RechnerView({ data, save }) {
         </div>
         <div className="bg-stone-900 text-white rounded-xl p-6">
           <h3 className="font-semibold mb-4">Ergebnis</h3>
-          <div className="space-y-3"><div><div className="text-xs text-stone-400 uppercase">AV</div><div className="text-2xl font-bold">{fmtEUR(calc.avRev)}</div></div><div><div className="text-xs text-stone-400 uppercase">BU</div><div className="text-2xl font-bold">{fmtEUR(calc.buRev)}</div></div><div className="border-t border-stone-700 pt-3"><div className="text-xs text-stone-400 uppercase">Gesamt</div><div className="text-4xl font-bold">{fmtEUR(calc.total)}</div></div></div>
+          <div className="space-y-3">
+            <div><div className="text-xs text-stone-400 uppercase">AV</div><div className="text-2xl font-bold">{fmtEUR(calc.avRev)}</div></div>
+            <div><div className="text-xs text-stone-400 uppercase">BU</div><div className="text-2xl font-bold">{fmtEUR(calc.buRev)}</div></div>
+            <div className="border-t border-stone-700 pt-3"><div className="text-xs text-stone-400 uppercase">Gesamt</div><div className="text-4xl font-bold">{fmtEUR(calc.total)}</div></div>
+          </div>
         </div>
       </div>
     </div>
   );
 }
 
-function UmsaetzeView({ data, save }) {
-  const total = (data.manualRevenue || []).reduce((s, m) => s + (Number(m.amount) || 0), 0);
-  return (
-    <div>
-      <h1 className="text-5xl font-bold text-stone-900 mb-8">Manuelle Umsätze</h1>
-      <div className="bg-white rounded-xl p-6 border border-stone-200">
-        <div className="text-xs text-stone-500 uppercase mb-2">Summe</div>
-        <div className="text-4xl font-bold text-stone-900 mb-6">{fmtEUR(total)}</div>
-      </div>
-    </div>
-  );
-}
-
-function TeamView({ data, save }) {
+function Team({ data, save }) {
   const totalTeamRev = (data.partners || []).reduce((s, p) => s + (Number(p.revenue) || 0), 0);
   return (
     <div>
       <h1 className="text-5xl font-bold text-stone-900 mb-8">Mein Team</h1>
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div className="bg-white rounded-xl p-5 border border-stone-200">
           <div className="text-xs text-stone-500 uppercase mb-2">Teamgröße</div>
           <div className="text-3xl font-bold">{(data.partners || []).length}</div>
@@ -478,90 +414,7 @@ function TeamView({ data, save }) {
   );
 }
 
-function ZieleView({ data, save }) {
-  return (
-    <div>
-      <h1 className="text-5xl font-bold text-stone-900 mb-8">Ziele & Vision</h1>
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {[
-          { key: 'traeume', title: 'Träume' },
-          { key: 'wuensche', title: 'Wünsche' },
-          { key: 'werte', title: 'Werte' },
-          { key: 'vision', title: 'Vision' },
-        ].map(item => (
-          <div key={item.key} className="bg-white rounded-xl p-6 border border-stone-200">
-            <h3 className="font-semibold mb-3">{item.title}</h3>
-            <textarea value={(data.vision || {})[item.key] || ''} onChange={(e) => save({ ...data, vision: { ...(data.vision || {}), [item.key]: e.target.value } })} rows={5} className="w-full px-3 py-2 bg-stone-50 border border-stone-200 rounded-lg text-sm focus:outline-none focus:border-stone-400" />
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function CoachView({ data, save }) {
-  const [messages, setMessages] = useState(data.chatHistory || []);
-  const [input, setInput] = useState('');
-  const [loading, setLoading] = useState(false);
-  const scrollRef = useRef(null);
-
-  useEffect(() => { if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight; }, [messages, loading]);
-
-  const send = async () => {
-    if (!input.trim() || loading) return;
-    const userMsg = { role: 'user', content: input };
-    const newMessages = [...messages, userMsg];
-    setMessages(newMessages);
-    setInput('');
-    setLoading(true);
-    try {
-      const response = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: 'claude-sonnet-4-20250514',
-          max_tokens: 1024,
-          messages: newMessages.map(m => ({ role: m.role, content: m.content }))
-        })
-      });
-      const result = await response.json();
-      const text = (result.content || []).filter(c => c.type === 'text').map(c => c.text).join('\n');
-      const assistantMsg = { role: 'assistant', content: text || 'Entschuldigung, ich konnte nicht antworten.' };
-      const finalMessages = [...newMessages, assistantMsg];
-      setMessages(finalMessages);
-      await save({ ...data, chatHistory: finalMessages });
-    } catch {
-      setMessages([...newMessages, { role: 'assistant', content: 'Verbindung unterbrochen. Bitte versuche es erneut.' }]);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  return (
-    <div className="flex flex-col h-[calc(100vh-10rem)]">
-      <h1 className="text-5xl font-bold text-stone-900 mb-6">KI-Coach</h1>
-      <div className="flex-1 bg-white rounded-xl border border-stone-200 overflow-hidden flex flex-col">
-        <div ref={scrollRef} className="flex-1 overflow-y-auto p-6 space-y-4">
-          {messages.length === 0 && <div className="text-center py-12 text-stone-400">Starte ein Gespräch mit deinem Coach</div>}
-          {messages.map((m, idx) => (
-            <div key={idx} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
-              <div className={`max-w-xs rounded-xl px-4 py-2 ${m.role === 'user' ? 'bg-stone-900 text-white' : 'bg-stone-100'}`}>
-                <div className="text-sm">{m.content}</div>
-              </div>
-            </div>
-          ))}
-          {loading && <div className="flex justify-start"><div className="bg-stone-100 rounded-xl px-4 py-2"><Loader2 className="w-4 h-4 animate-spin" /></div></div>}
-        </div>
-        <div className="border-t border-stone-200 p-4 flex gap-2">
-          <Input value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); send(); } }} placeholder="Frage deinen Coach..." />
-          <Button onClick={send} disabled={loading || !input.trim()}><Send className="w-4 h-4" /></Button>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function SettingsView({ data, save, onResetPin }) {
+function Settings({ data, save, onLogout }) {
   const [name, setName] = useState(data.userName || '');
   return (
     <div>
@@ -571,7 +424,7 @@ function SettingsView({ data, save, onResetPin }) {
           <Label>Anzeigename</Label>
           <div className="flex gap-2"><Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Dein Name" /><Button onClick={() => save({ ...data, userName: name })}>Speichern</Button></div>
         </div>
-        <div className="pt-6 border-t"><Button variant="danger" onClick={onResetPin}><Lock className="w-4 h-4" />PIN zurücksetzen</Button></div>
+        <div className="pt-6 border-t"><Button variant="danger" onClick={onLogout}><LogOut className="w-4 h-4" />Abmelden</Button></div>
       </div>
     </div>
   );
